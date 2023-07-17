@@ -1,0 +1,470 @@
+---
+title: "LovingSiteModeling"
+author: "William Zhang"
+date: "2023-06-20"
+output: html_document
+---
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+```
+
+```{r, include=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(geosphere)
+library(leaflet)
+library(leaflet.extras)
+library(lubridate)
+library(lmtest)
+library(randomForest)
+library(vip)
+library(car)
+library(mgcv)
+library(xgboost)
+library(tseries)
+```
+
+# Part 1: Inital exploration on radioactivity measurements alone
+```{r}
+lovings <- read.csv("LNM_rd_2023_q2_v1.5.csv", skip=1)
+```
+```{r}
+lovings$new_time <- as_datetime(lovings$time)
+lovings <- lovings %>% mutate(date = as.Date(new_time),
+                              hour = hour(new_time))
+```
+```{r}
+# mean of measurements on a daily basis
+lovings_daily <- lovings %>% 
+  group_by(date) %>% 
+  summarize(radon = mean(radon_pCi),
+            rd_particle = mean(rd_particle_pCi))
+```
+
+```{r}
+ggplot(lovings_daily) +
+  geom_point(aes(date, radon)) + 
+  geom_smooth(aes(date, radon), method = lm) + 
+  ggtitle("Mean radon measurements daily since 04-15")
+```
+```{r}
+# mean of measurements on a hourly basis
+lovings_hourly <- lovings %>% 
+  group_by(date, hour) %>% 
+  summarize(radon = mean(radon_pCi),
+            rd_particle = mean(rd_particle_pCi))
+```
+```{r}
+ggplot(lovings_hourly %>% group_by(hour) %>% 
+         summarize(radon = mean(radon),
+                   rd_particle = mean(rd_particle)), 
+       aes(hour, radon)) +
+  geom_point() + 
+  geom_smooth(method = "gam") + 
+  ggtitle("Mean radon measurements for each hour")
+```
+```{r}
+ggplot(lovings_daily, aes(date, rd_particle)) +
+  geom_point() + 
+  geom_smooth(method = lm) + 
+  ggtitle("Mean rd-particle measurements daily since 04-15")
+```
+```{r}
+ggplot(lovings_hourly %>% group_by(hour) %>% 
+         summarize(radon = mean(radon),
+                   rd_particle = mean(rd_particle)), 
+       aes(hour, rd_particle)) +
+  geom_point() + 
+  geom_smooth(method = "gam") + 
+  ggtitle("Mean rd-particle measurements for each hour")
+```
+```{r}
+ggplot(lovings_hourly %>% group_by(hour) %>% 
+         summarize(radon = mean(radon),
+                   rd_particle = mean(rd_particle))) +
+  geom_point(aes(hour, rd_particle, color = "rd-particle")) + 
+  geom_smooth(aes(hour, rd_particle), method = "gam") + 
+  geom_point(aes(hour, radon, color = "radon")) + 
+  geom_smooth(aes(hour, radon), method = "gam") + 
+  ggtitle("Both radioactivity particle measurements for each hour")
+```
+
+
+```{r}
+dwtest(lovings$radon_pCi ~ lovings$new_time)
+```
+# Part 2: Radon and Gross Beta measurement
+```{r}
+GB_new <- read.csv("./radNet/radnet-GB-new.csv")
+```
+```{r}
+# subset to only 4-15 to 6-13
+GB_0415 <- GB_new %>% filter(Location == "CARLSBAD") %>% filter(Sample.Date >= "2023-04-15") %>% filter(Sample.Date <= "2023-06-13")
+```
+```{r}
+ggplot(lovings_daily) +
+  geom_point(aes(date, radon)) + 
+  geom_point(data = GB_0415 %>% mutate(Sample.Date = as.Date(Sample.Date)), aes(Sample.Date, Result * 60, color = 'red')) + 
+  scale_y_continuous(
+    "radon (pCi)", 
+    sec.axis = sec_axis(~ . * 0.01666, name = "GB (pCi)")
+  )
+```
+*Comment:* Could not really associate GB from RadNet and Radon since insufficient GB measurements over the 2 months.
+
+# Part 3: Data Merging with VNF dataset
+```{r}
+# flaring from start of April to recent
+flaring_recent <- readRDS("./pb_vnf/pb-vnf_new.rds")
+```
+```{r}
+flaring_recent <- flaring_recent %>% filter(temp_bb >= 1600)
+```
+```{r}
+# lon, lat of Loving monitor:  (-104.1089, 32.2961)
+loving_lonlat <- c(-104.1089, 32.2961)
+distance_km_lov <- function(long, lati){
+  start <- c(long, lati)
+  distGeo(start, loving_lonlat) / 1000
+}
+
+# 32.297345,-104.109386
+loving_lonlat2 <- c(-104.1089, 32.2961)
+distance_km_lov <- function(long, lati){
+  start <- c(long, lati)
+  distGeo(start, loving_lonlat) / 1000
+}
+```
+```{r}
+flaring_distance <- flaring_recent %>% 
+  mutate(distToLovi = mapply(distance_km_lov, lon, lat)) %>% 
+  select(c("datetime", "distToLovi", "temp_bb", "rhi", "area_bb", "lon", "lat")) 
+```
+
+## Exploring the distance to Loving station
+```{r}
+flaring_distance <- flaring_distance %>% 
+  mutate(dist_cat = case_when(distToLovi < 1 ~ "<1km",
+                              distToLovi >= 1 & distToLovi < 5 ~ "1~5km",
+                              distToLovi >= 5 & distToLovi < 10 ~ "5~10km",
+                              distToLovi >= 10 & distToLovi < 20 ~ "10~20km",
+                              TRUE ~ ">=20km"))
+
+# How many flaring within the distance categories
+flaring_distance %>% 
+  group_by(dist_cat) %>% 
+  summarize(count = n())
+```
+
+## Exporing relative locations
+```{r}
+# Loving monitor (-104.1089, 32.2961)
+leaflet() %>%
+  addProviderTiles("Esri.WorldImagery") %>% 
+  addProviderTiles("CartoDB.PositronOnlyLabels") %>% 
+  addCircleMarkers(data=data.frame(lng=-104.1089, lat=32.2961),lng=~lng,lat=~lat,
+                   radius=7,fillColor=~'black',fillOpacity = 0.99, weight = 1,
+                   col='white',stroke = T, group = 'Loving Monitor') %>% 
+  addCircleMarkers(data=flaring_distance, lng=~lon, lat=~lat,
+                   stroke = T, fillColor = ~case_when(dist_cat == "<1km" ~ "red",
+                                                      dist_cat == "1~5km" ~ "orange",
+                                                      dist_cat == "5~10km" ~ "yellow",
+                                                      dist_cat == "10~20km" ~ "green",
+                                                      dist_cat == ">=20km" ~ "lightgrey"
+                     
+                   ), radius = 2, weight = 1,
+                   group = 'Flares', col='white', fillOpacity = 0.7) %>% 
+  addLegend(colors = c('red', 'orange', 'yellow', 'green', 'lightgrey', 'black'), 
+            labels = c('<1km','1~5km','5~10km', '10~20km', '>=20km', 'Lovinf Monitor'),
+            position = 'bottomleft')
+```
+
+## Connecting to radioactivity measurement
+
+### On a daily basis
+```{r}
+# Same day 
+
+flaring_sameday <- merge(x = lovings_daily,
+                        y = (flaring_distance %>% mutate(datetime = as.Date(datetime)) %>% filter(datetime >= "2023-04-15") 
+                             %>% filter(distToLovi <= 20)),
+                        by.x = "date",
+                        by.y = "datetime",
+                        all.x = TRUE,
+                        all.y = FALSE)
+```
+```{r}
+# count model
+flaring_sameday_count <- flaring_distance %>% 
+  mutate(datetime = as.Date(datetime)) %>% 
+  filter(datetime >= "2023-04-15") %>% 
+  filter(distToLovi <= 20) %>% 
+  group_by(datetime) %>% 
+  summarize(count = n(),
+            mean_temp = mean(temp_bb),
+            mean_rhi = mean(rhi),
+            mean_area = mean(area_bb),
+            mean_dist = mean(distToLovi))
+
+flaring_sameday_count <- merge(x = flaring_sameday_count,
+                        y = lovings_daily,
+                        by.x = "datetime",
+                        by.y = "date",
+                        all.x = FALSE,
+                        all.y = TRUE)
+```
+
+### adding pollutant and weather data
+```{r}
+met <- read.csv("./pollutant/LNM_met_2023_q2_v1.5.csv", skip = 1)
+met$new_time <- as_datetime(met$time)
+met <- met %>% mutate(date = as.Date(new_time),
+                              hour = hour(new_time))
+```
+```{r}
+nox <- read.csv("./pollutant/LNM_nox_2023_q2_v1.5.csv", skip = 1)
+nox$new_time <- as_datetime(nox$time)
+nox <- nox %>% mutate(date = as.Date(new_time),
+                              hour = hour(new_time))
+```
+```{r}
+o3 <- read.csv("./pollutant/LNM_o3_2023_q2_v1.5.csv", skip = 1)
+o3$new_time <- as_datetime(o3$time)
+o3 <- o3 %>% mutate(date = as.Date(new_time),
+                              hour = hour(new_time))
+```
+
+# Merging in pollutant data
+```{r}
+flaring_sameday_poll <- merge(x = flaring_sameday,
+                         y = o3 %>% select(date, o3) %>% group_by(date) %>% summarize(mean_o3 = mean(o3)),
+                         by.x = "date",
+                         by.y = "date",
+                         all.x = TRUE,
+                         all.y = FALSE)
+```
+```{r}
+flaring_sameday_poll <- merge(x = flaring_sameday_poll,
+                         y = nox %>% select(date, no, no2, nox) %>% group_by(date) %>% summarize(mean_no = mean(no),
+                                                                                                 mean_no2 = mean(no2),
+                                                                                                 mean_nox = mean(nox)),
+                         by.x = "date",
+                         by.y = "date",
+                         all.x = TRUE,
+                         all.y = FALSE)
+```
+```{r}
+flaring_sameday_poll <- merge(x = flaring_sameday_poll,
+                         y = met %>% 
+                           select(date, temp_f, t_room_f, pressure_altcorr, wsp, relh, solr) %>% 
+                           group_by(date) %>% 
+                           summarize(mean_tempf = mean(temp_f),
+                                     mean_room_f = mean(t_room_f),
+                                     mean_press = mean(pressure_altcorr),
+                                     mean_wsp = mean(wsp),
+                                     mean_relh = mean(relh),
+                                     mean_solar = mean(solr)),
+                         by.x = "date",
+                         by.y = "date",
+                         all.x = TRUE,
+                         all.y = FALSE)
+```
+
+# Modeling
+
+## THESE USES THE PROBLEMATIC DATAFRAME (repeated radon entries)
+```{r}
+base_lm <- lm(radon ~ . - rd_particle, data = flaring_sameday)
+summary(base_lm)
+base_lmcount <- lm(radon ~ . - rd_particle, data = flaring_sameday_count) # this one is still count, but is too base model to be useful
+summary(base_lmcount)
+base_gam <- gam(radon ~ date + distToLovi + temp_bb + rhi + area_bb + lon + lat + dist_cat, data = flaring_sameday)
+summary(base_gam)
+```
+```{r}
+pollu_lm <- lm(radon ~ . - rd_particle - mean_solar - mean_tempf, data = flaring_sameday_poll)
+summary(pollu_lm)
+```
+
+```{r}
+gam_pollu_v1 <- gam(radon ~ distToLovi + temp_bb + rhi + area_bb + mean_o3 + mean_no + mean_no2 + mean_nox + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + date + mean_tempf, data = flaring_sameday_poll)
+summary(gam_pollu_v1)
+```
+```{r}
+vif(pollu_lm)
+```
+
+```{r}
+gam_pollu_v2 <- gam(radon ~  temp_bb + mean_no + mean_no2 + mean_nox + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + date + mean_tempf, data = flaring_sameday_poll)
+summary(gam_pollu_v2)
+```
+
+```{r}
+anova.gam(gam_pollu_v2)
+```
+
+## Starting here is the count model that's daily radon measurement + count of flares on that day
+```{r}
+flaring_count <- flaring_distance %>% mutate(datetime = as.Date(datetime)) %>% 
+  filter(datetime >= "2023-04-15") %>% 
+  filter(distToLovi <= 20) %>% 
+  group_by(datetime) %>% 
+  summarize(count = n())
+```
+```{r}
+# count_model
+flaring_sameday_count_poll <- flaring_sameday_poll %>% 
+  group_by(date) %>% 
+  summarize(radon = mean(radon),
+            rd_particle = mean(rd_particle),
+            mean_no = mean(mean_no), #these are already daily,
+            mean_no2 = mean(mean_no2) ,
+            mean_nox = mean(mean_nox),
+            mean_room_f = mean(mean_room_f),
+            mean_press = mean(mean_press),
+            mean_wsp = mean(mean_wsp),
+            mean_relh = mean(mean_relh),
+            mean_solar = mean(mean_solar),
+            mean_tempf = mean(mean_tempf),
+            mean_o3 = mean(mean_o3),
+            mean_area_bb = mean(area_bb),# these were not 
+            mean_temp_bb = mean(temp_bb),
+            mean_rhi = mean(rhi),
+            mean_dist = mean(distToLovi)
+            )
+flaring_sameday_count_poll <- merge(x=flaring_sameday_count_poll,
+                                    y=flaring_count,
+                                    by.x = "date",
+                                    by.y = "datetime",
+                                    all.x = TRUE,
+                                    all.y = FALSE)
+```
+```{r}
+# put 0 for count whenever missing
+flaring_sameday_count_poll$count[is.na(flaring_sameday_count_poll$count)] <- 0
+```
+
+```{r}
+# (34 observations deleted due to missingness) when including flaring data
+count_poll_lm <- lm(radon ~ . - rd_particle, data = flaring_sameday_count_poll)
+summary(count_poll_lm)
+```
+```{r}
+# this doesn't have any flaring related measurements (except count), since those had a lot of missings
+# only 5 observations missing (from mean_solar)
+count_poll_lmv2 <- lm(radon ~ date + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3 + count, data = flaring_sameday_count_poll)
+summary(count_poll_lmv2)
+```
+
+```{r}
+# this one no flaring measurements except count again
+count_poll_gam <- gam(radon ~ date + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3 + count, data = flaring_sameday_count_poll)
+summary(count_poll_gam)
+```
+
+
+# Hourly Modeling
+
+```{r}
+met_hourly <- met %>% group_by(date, hour) %>% 
+  summarize(temp_f = mean(temp_f),
+            wsp = mean(wsp),
+            solr = mean(solr),
+            t_room_f = mean(t_room_f))
+```
+
+```{r}
+nox_hourly <- nox %>% group_by(date, hour) %>% 
+  summarize(no = mean(no),
+            no2 = mean(no2),
+            nox = mean(nox))
+```
+```{r}
+o3_hourly <- o3 %>% group_by(date, hour) %>% 
+  summarize(o3 = mean(o3))
+```
+
+```{r}
+hourly_data <- merge(x = lovings_hourly,
+                     y = met_hourly,
+                     by = c("date", "hour"),
+                     all = FALSE)
+hourly_data <- merge(x = hourly_data,
+                     y = nox_hourly,
+                     by = c("date", "hour"),
+                     all = FALSE)
+
+hourly_data <- merge(x = hourly_data,
+                     y = o3_hourly,
+                     by = c("date", "hour"),
+                     all = FALSE)
+```
+```{r}
+# add daily count
+hourly_data <- merge(x = hourly_data,
+                     y = flaring_count,
+                     by.x = "date",
+                     by.y = "datetime",
+                     all.x = TRUE,
+                     all.y = FALSE)
+```
+```{r}
+# Make NA into 0
+hourly_data <- replace(hourly_data, is.na(hourly_data), 0)
+```
+
+```{r}
+# response is radon
+hourly_gam_v1 <- gam(radon ~ hour + temp_f + wsp + solr + t_room_f + no + no2 + nox + o3 + count, data=hourly_data)
+summary(hourly_gam_v1)
+```
+```{r}
+# response is rd_particle
+hourly_gam_v2 <- gam(rd_particle ~ hour + temp_f + wsp + solr + t_room_f + no + no2 + nox + o3 + count, data=hourly_data)
+summary(hourly_gam_v2)
+```
+```{r}
+hourly_lm_v1 <- lm(radon ~ hour + temp_f + wsp + solr + t_room_f + nox + o3 + count, data=hourly_data)
+summary(hourly_lm_v1)
+```
+
+```{r}
+vif(hourly_lm_v1)
+```
+
+# Machine learning models
+```{r}
+set.seed(5)
+```
+
+```{r}
+n_features <- dim(hourly_data)[2] - 2
+train <- sample(1:nrow(hourly_data), round(0.7*nrow(hourly_data)))
+hourly_train <- hourly_data[train,]
+hourly_test <- hourly_data[-train,]
+```
+```{r}
+# Random forest
+hourly_rf <- randomForest(radon ~ . - rd_particle,
+                              data = hourly_train,
+                              test = hourly_test,
+                              importance=TRUE,
+                              na.action = na.omit)
+# psuedo R_square: 1 - mse / Var(y)
+mean(hourly_rf$rsq)
+```
+
+```{r}
+varImpPlot(hourly_rf)
+```
+
+
+# Time Series
+
+
+```{r}
+# hourly lag
+acf(lovings_hourly$radon[1:1000])
+```
+

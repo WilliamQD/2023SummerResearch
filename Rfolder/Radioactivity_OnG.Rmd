@@ -1,0 +1,495 @@
+---
+title: "Radioactivity_OnG"
+author: "William Zhang"
+date: "2023-06-06"
+output: html_document
+---
+*Source*: https://www.epa.gov/radtown/radioactive-waste-material-oil-and-gas-drilling
+Radionuclides commonly found in TENORM are radium, radon, uranium, potassium and thorium.
+
+*Source*: https://www.nrdc.org/bio/bemnet-alemayehu/radioactive-material-oil-and-gas-industry#:~:text=When%20it%20comes%20to%20oil,%2D226%20and%20Radium%2D228.
+When it comes to oil and gas exploration and production, the greatest radiation health risk is cancer due to exposure to Radium-226 and Radium-228. Underground oil and gas reservoirs often contain elevated levels of radioactive materials in comparison with that found aboveground, mostly Radium-226 and Radium-228. Once drilling begins, radioactive materials that would have otherwise been confined beneath the surface can be released into the air, onto land, or into surface water or groundwater. As they become concentrated, it leads to environmental contamination and can accumulate in people’s bodies.
+
+Radium also decays into radon isotopes and, when inhaled, deposit radiation in lungs, causing lung cancer. In fact, radon is the second-leading cause of lung cancer in the U. S. Radon decay products, including lead-210 and polonium-210, are also present in high levels in gas handling equipment and can further contribute to cancer risk. 
+
+*Source*: https://journals.sagepub.com/doi/pdf/10.2190/NS.23.1.h
+Soil and water (sludge) obtained from reserve pits used in unconventional natural gas mining was analyzed for the presence of technologically enhanced naturally occurring radioactive material (TENORM). Samples were analyzedfor total gamma, alpha, and beta radiation, and specific radionuclides: beryllium, potassium, scandium, cobalt, cesium, thallium, lead-210 and -214, bismuth-212 and -214, radium-226 and -228, thorium, uranium, and strontium-89 and -90. Laboratory analysis confirmed elevated beta readings recorded at 1329 ± 311 pCi/g. Specific radionuclides present in an active reserve pit and the soil of a leveled, vacated reserve pit included 232Thorium decay series (228Ra, 228Th, 208Tl), and 226Radium decay series (214Pb, 214Bi, 210Pb) radionuclides. The potential for impact of TENORM to the environment, occupational workers, and the general public is presented with potential health effects of individual radionuclides. Current oversight, exemption of TENORM in federal and state regulations, and complexity in reporting are discussed.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+library(geosphere)
+library(car)
+library(lmtest)
+library(mgcv)
+library(tidyverse)
+library(caret)
+library(gridExtra)
+```
+
+```{r}
+GB <- read.csv("./radNet/radnet-GB-new.csv")
+potassium40 <- read.csv("./radNet/radnet-potassium40.csv")
+radium228 <- read.csv("./radNet/radnet-radium228.csv")
+```
+
+# radium-228
+```{r, include=FALSE}
+radium228 %>% filter(Location == "CARLSBAD")
+```
+
+# potassium-40
+```{r, include=FALSE}
+potassium40 %>% filter(Location == "CARLSBAD")
+```
+
+
+
+# gross beta
+```{r}
+GB %>% filter(Location == "CARLSBAD")
+```
+```{r}
+# group gross beta measurement monthly
+GB_monthly <- GB %>% filter(Location == "CARLSBAD") %>% mutate(Date = substr(Sample.Date, 1, 7)) %>% group_by(Date) %>% 
+  summarize(mean_result = mean(Result))
+```
+```{r}
+ggplot(GB_monthly, aes(Date, mean_result)) +
+  geom_point()
+```
+
+## Merging flaring data
+
+```{r}
+pb_vnf <- readRDS('./pb_vnf/pb-vnf.rds')
+```
+```{r}
+# Only keep 1600K and above for temp_bb, 400k observations -> 391k
+pb_vnf <- pb_vnf %>% filter(temp_bb >= 1600)
+```
+```{r}
+# lon, lat of Carlsbad monitor:  (32.3840, -104.2640)
+carlsbad_lonlat <- c(-104.2640, 32.3840)
+distance_km <- function(long, lati){
+  start <- c(long, lati)
+  distGeo(start, carlsbad_lonlat) / 1000
+}
+
+```
+
+```{r}
+pb_vnf_distance <- pb_vnf %>% 
+  mutate(distToCarls = mapply(distance_km, lon, lat)) %>% 
+  select(c("vnf_id", "date", "distToCarls", "temp_bb", "rhi", "area_bb", "lon", "lat")) 
+```
+
+## Exploring the distance to Carlsbad station
+```{r}
+pb_vnf_distance <- pb_vnf_distance %>% 
+  mutate(dist_cat = case_when(distToCarls < 1 ~ "<1km",
+                              distToCarls >= 1 & distToCarls < 5 ~ "1~5km",
+                              distToCarls >= 5 & distToCarls < 10 ~ "5~10km",
+                              TRUE ~ ">=10km"))
+```
+```{r}
+pb_vnf_distance %>% 
+  group_by(dist_cat) %>% 
+  summarize(count = n())
+```
+```{r}
+pb_vnf_distance <- pb_vnf_distance %>% filter(dist_cat != ">=10km")
+```
+
+
+## Exporing relative locations
+```{r}
+library(leaflet)
+library(leaflet.extras)
+```
+
+
+```{r, include=FALSE}
+leaflet() %>%
+  addProviderTiles("Esri.WorldImagery") %>% 
+  addProviderTiles("CartoDB.PositronOnlyLabels") %>% 
+  addCircleMarkers(data=data.frame(lng=-104.2640, lat=32.3840),lng=~lng,lat=~lat,
+                   radius=7,fillColor=~'black',fillOpacity = 0.99, weight = 1,
+                   col='white',stroke = T, group = 'RadNet Monitor') %>% 
+  addCircleMarkers(data=pb_vnf_distance, lng=~lon, lat=~lat,
+                   stroke = T, fillColor = ~case_when(dist_cat == "<1km" ~ "red",
+                                                      dist_cat == "1~5km" ~ "orange",
+                                                      dist_cat == "5~10km" ~ "yellow",
+                     
+                   ), radius = 2, weight = 1,
+                   group = 'Flares', col='white', fillOpacity = 0.7) %>% 
+  addLegend(colors = c('red', 'orange', 'yellow', 'black'), 
+            labels = c('<1km','1~5km','5~10km', 'RadNet monitor'),
+            position = 'bottomleft')
+```
+
+
+## Connecting to radioactivity measurement
+```{r}
+GB_monthly
+```
+```{r}
+pb_vnf_monthly <- pb_vnf_distance %>% mutate(date = substr(date, 1, 7)) %>% group_by(date) %>% 
+  summarize(count = n())
+```
+```{r}
+seq_dates <- data.frame(date = seq.Date(from = as.Date("2014-09-01"), 
+                           to = as.Date("2022-07-01"),
+                           by = "month"))
+seq_dates <- seq_dates %>% mutate(date = substr(date, 1, 7))
+```
+
+```{r}
+pb_vnf_merge <- merge(x = pb_vnf_monthly,
+                        y = seq_dates,
+                        by.x = "date",
+                        by.y = "date",
+                        all.x = TRUE,
+                        all.y = TRUE) 
+pb_vnf_merge <- pb_vnf_merge %>% mutate(count = if_else(is.na(count), 0, count))
+```
+
+```{r}
+GB_monthly <- GB_monthly %>% filter(Date >= "2014-09" & Date <= "2022-07") 
+pb_vnf_merge <- pb_vnf_merge %>% filter(date %in% GB_monthly$Date)
+pb_vnf_merge <- merge(x = pb_vnf_merge,
+                        y = GB_monthly,
+                        by.x = "date",
+                        by.y = "Date",
+                        all.x = TRUE,
+                        all.y = TRUE)
+pb_vnf_merge <- pb_vnf_merge %>% mutate(unix_time = as.numeric(as.POSIXct(paste0(date, "-01"), format="%Y-%m-%d")))
+```
+
+```{r}
+pb_vnf_monthly <- pb_vnf_distance %>% mutate(month = substr(date, 1, 7))
+pb_vnf_monthly <- merge(x = pb_vnf_monthly,
+                        y = GB_monthly,
+                        by.x = "month",
+                        by.y = "Date",
+                        all.x = TRUE,
+                        all.y = FALSE)
+```
+
+
+# Modeling
+```{r}
+glm0 <- glm(mean_result ~ 1, data = pb_vnf_merge)
+summary(glm0)
+```
+
+```{r}
+glm1 <- glm(mean_result ~ count, data = pb_vnf_merge)
+summary(glm1)
+```
+```{r}
+lm1 <- lm(mean_result ~ count, data = pb_vnf_merge)
+summary(lm1)
+```
+
+```{r}
+glm2 <- glm(mean_result ~ temp_bb + rhi + area_bb + distToCarls, data = pb_vnf_monthly, na.action = "na.exclude")
+summary(glm2)
+```
+```{r}
+glm3 <- glm(mean_result ~ temp_bb + rhi + area_bb + distToCarls + splines::bs(as.numeric(as.POSIXct(date)), df = 6), data = pb_vnf_monthly, na.action = "na.exclude")
+summary(glm3)
+```
+
+```{r}
+lm2 <- lm(mean_result ~ temp_bb + rhi + area_bb + distToCarls + as.numeric(as.POSIXct(date)), data = pb_vnf_monthly, na.action = "na.exclude")
+summary(lm2)
+```
+
+# Weather data
+```{r}
+weather <- read_rds("./NMED_monitor/data/pol_data.rds")
+```
+```{r}
+weatherex <- weather %>% 
+  mutate(date = as.Date(substr(date, 1, 10)))
+```
+```{r}
+# helper method for finding mode
+Mode <- function(x) {
+  ux <- unique(x)
+  ux[which.max(tabulate(match(x, ux)))]
+}
+```
+
+```{r}
+weather_daily <- weatherex %>% 
+  group_by(date) %>% 
+  summarise(mean_solar = mean(`Solar Rad`),
+            mean_temp = mean(Temp_2m),
+            mean_ws = mean(ws),
+            oil = mean(oil),
+            gas = mean(gas),
+            # add most frequent wind direction
+            most_wind_direction = Mode(wd_sec))
+```
+
+```{r}
+pb_vnf_weather <- merge(x = pb_vnf_monthly,
+                        y = weather_daily,
+                        by.x = "date",
+                        by.y = "date",
+                        all.x = FALSE,
+                        all.y = FALSE)
+```
+
+```{r}
+glm4 <- glm(mean_result ~ temp_bb + 
+              rhi + 
+              area_bb + 
+              distToCarls + 
+              splines::bs(as.numeric(as.POSIXct(date)) , df = 6) +
+              mean_solar + 
+              mean_temp + 
+              mean_ws + 
+              oil + gas, data = pb_vnf_weather, na.action = "na.exclude")
+summary(glm4)
+```
+```{r}
+lm4 <- lm(mean_result ~ temp_bb + 
+              rhi + 
+              area_bb + 
+              distToCarls + 
+              as.numeric(as.POSIXct(date)) +
+              mean_solar + 
+              mean_temp + 
+              mean_ws + 
+              oil + gas, data = pb_vnf_weather, na.action = "na.exclude")
+summary(lm4)
+```
+
+# Adding wind direction and counts
+```{r}
+# getting counts for number of vnf in month/day
+vnf_month_counts <- pb_vnf_monthly %>% group_by(month) %>% summarize(month_count = n())
+vnf_day_counts <- pb_vnf_monthly %>% group_by(date) %>% summarize(day_count = n())
+```
+```{r}
+pb_vnf_complete <- merge(x = pb_vnf_weather,
+                         y = vnf_month_counts,
+                         by.x = "month",
+                         by.y = "month",
+                         all.x = TRUE,
+                         all.y = TRUE)
+pb_vnf_complete <- merge(x = pb_vnf_complete,
+                         y = vnf_day_counts,
+                         by.x = "date",
+                         by.y = "date",
+                         all.x = TRUE,
+                         all.y = TRUE)
+```
+```{r}
+# modeling
+lm_complete <- lm(mean_result ~ temp_bb + 
+                    rhi + 
+                    area_bb + 
+                    distToCarls + 
+                    as.numeric(as.POSIXct(date)) +
+                    mean_solar + 
+                    mean_temp + 
+                    mean_ws + 
+                    oil + gas + 
+                    most_wind_direction +
+                    month_count + 
+                    day_count, data = pb_vnf_complete, na.action = "na.omit")
+summary(lm_complete)
+```
+```{r}
+# lot of missingness in the weather data
+colSums(is.na(pb_vnf_complete))
+```
+```{r}
+# fit one more without those weather variables
+lm_noweather <- lm(mean_result ~ temp_bb + 
+                    rhi + 
+                    area_bb + 
+                    distToCarls + 
+                    as.numeric(as.POSIXct(date)) +
+                    oil + gas + 
+                    month_count + 
+                    day_count, data = pb_vnf_complete %>% select(-c("mean_temp", "mean_ws", "most_wind_direction", "mean_solar")), na.action = "na.omit")
+summary(lm_noweather)
+```
+
+```{r}
+lm_complete2 <- lm(mean_result ~ temp_bb + 
+                    area_bb + 
+                    distToCarls + 
+                    as.numeric(as.POSIXct(date)) +
+                    oil + gas + 
+                    mean_solar + 
+                    month_count + 
+                    day_count, data = pb_vnf_complete, na.action = "na.omit")
+summary(lm_complete2)
+```
+```{r}
+vif(lm_complete)
+```
+
+```{r}
+vif(lm_complete2)
+```
+
+
+# Gam models
+```{r}
+gam_complete <- gam(mean_result ~ temp_bb + 
+                    rhi + 
+                    area_bb + 
+                    distToCarls + 
+                    as.numeric(as.POSIXct(date)) +
+                    mean_solar + 
+                    mean_temp + 
+                    mean_ws + 
+                    oil + gas + 
+                    most_wind_direction +
+                    month_count + 
+                    day_count, data = pb_vnf_complete)
+summary(gam_complete)
+```
+
+```{r}
+# Smooth on oil and gas
+
+gam_v2 <- gam(mean_result ~ temp_bb + 
+                    rhi + 
+                    area_bb + 
+                    distToCarls + 
+                    as.numeric(as.POSIXct(date)) +
+                    mean_solar + 
+                    mean_temp + 
+                    mean_ws + 
+                    s(oil, bs = "cr") + 
+                    s(gas, bs ="cr") + 
+                    most_wind_direction +
+                    month_count + 
+                    day_count, data = pb_vnf_complete)
+summary(gam_v2)
+```
+
+```{r}
+# Standardizing dataframe
+pb_vnf_pre <- pb_vnf_complete %>% mutate(date = as.numeric(as.POSIXct(date)))
+preprocessParams <- preProcess(pb_vnf_pre %>% select(mean_result, temp_bb, mean_solar, mean_temp, mean_ws, rhi, area_bb, oil, gas, distToCarls, date, month_count, day_count), method=c("range"))
+```
+```{r}
+print(preprocessParams)
+```
+```{r}
+transformed <- predict(preprocessParams, pb_vnf_pre %>% select(mean_result, temp_bb, mean_solar, mean_temp, mean_ws, rhi, area_bb, oil, gas, distToCarls, date, month_count, day_count))
+```
+
+```{r}
+# fitting the scaled model
+gam_v3 <- gam(mean_result ~ date + temp_bb + mean_solar + mean_temp + mean_ws + rhi + area_bb + oil + gas + distToCarls + month_count + day_count, data=transformed)
+summary(gam_v3)
+```
+
+
+```{r}
+# smaller model with normalization and smoothing
+gam_v4 <- gam(mean_result ~ s(date, bs="cr") + temp_bb + mean_solar + mean_temp + area_bb + s(oil, bs="cr") + s(gas, bs="cr") + distToCarls + month_count + day_count, data=transformed)
+summary(gam_v4)
+```
+```{r}
+plot(gam_v4)
+```
+
+
+```{r}
+# before transform
+bt_oil <- ggplot(pb_vnf_complete, aes(date, oil)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+# after transform
+at_oil <- ggplot(transformed, aes(date, oil)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+
+grid.arrange(bt_oil, at_oil, ncol = 2)
+```
+
+```{r}
+# before transform
+bt_gas <- ggplot(pb_vnf_complete, aes(date, gas)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+# after transform
+at_gas <- ggplot(transformed, aes(date, gas)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+
+grid.arrange(bt_gas, at_gas, ncol = 2)
+```
+```{r}
+# before transform
+bt_GB <- ggplot(pb_vnf_complete, aes(date, mean_result)) +
+  geom_point(na.rm = TRUE) + 
+  geom_smooth(method = "gam", na.rm = TRUE)
+# after transform
+at_GB <- ggplot(transformed, aes(date, mean_result)) +
+  geom_point(na.rm = TRUE) + 
+  geom_smooth(method = "gam", na.rm = TRUE)
+grid.arrange(bt_GB, at_GB, nrow = 2)
+```
+```{r}
+at_oil_m <- ggplot(pb_vnf_complete, aes(oil, mean_result)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+at_gas_m <- ggplot(transformed, aes(gas, mean_result)) +
+  geom_point() + 
+  geom_smooth(method = "gam")
+
+grid.arrange(at_oil_m, at_gas_m, ncol = 2)
+```
+
+
+# Fit on GB daily
+```{r}
+GB_daily <- GB %>% filter(Location == "CARLSBAD") %>% select(Sample.Date, Result) %>% mutate(date = as.Date(Sample.Date)) %>% select(-Sample.Date)
+
+pb_vnf_daily <- pb_vnf_complete %>% select(-mean_result) %>% group_by(date) %>% 
+  summarize(distToCarls = mean(distToCarls),
+            temp_bb = mean(temp_bb),
+            rhi = mean(rhi),
+            area_bb = mean(area_bb),
+            mean_solar = mean(mean_solar), # belows should have no change since they're already daily
+            mean_temp = mean(mean_temp),
+            mean_ws = mean(mean_ws),
+            oil = mean(oil),
+            gas = mean(gas),
+            month_count = mean(month_count),
+            day_count = mean(day_count))
+```
+```{r}
+GB_daily_complete <- merge(x = GB_each,
+                          y = pb_vnf_daily,
+                          by.x = "date",
+                          by.y = "date",
+                          all.x = FALSE,
+                          all.y = FALSE)
+```
+
+```{r}
+# Modeling with GB_daily
+lm_gb <- lm(Result * 1000 ~ ., data=GB_daily_complete)
+summary(lm_gb)
+gam_gb <- gam(Result ~ date + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + oil + gas +month_count + day_count , data=GB_daily_complete)
+summary(gam_gb)
+```
+```{r}
+gam_gb_v2 <- gam(Result ~ s(as.numeric(date), bs="cr") + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + s(oil, bs="cr") + s(gas, bs="cr") + month_count + day_count , data=GB_daily_complete)
+summary(gam_gb_v2)
+```
+
+

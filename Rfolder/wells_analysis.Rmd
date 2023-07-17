@@ -1,0 +1,122 @@
+---
+title: "wells anlysis"
+author: "William Zhang"
+date: "2023-05-11"
+output: html_document
+---
+```{r}
+library(leaflet)
+library(tidyverse)
+library(dplyr)
+library(geosphere)
+library(leaflet.extras)
+```
+
+```{r}
+wells_clean <- readRDS('cleaned_wells_cb.rds')
+wells_prod <- readRDS('cb_wells_prod.rds')
+pb_vnf <- readRDS('./pb_vnf/pb-vnf.rds')
+```
+```{r}
+colnames(wells_clean)
+```
+
+```{r}
+unique(wells_clean$drill_type)
+unique(wells_clean$production_type)
+unique(wells_clean$well_status)
+```
+
+```{r}
+unique(wells_clean$well_status)
+```
+
+```{r}
+leaflet() %>% 
+  addProviderTiles("OpenStreetMap") %>% 
+  addCircles(lat=~uog_lat, lng=~uog_lon, color = case_when(wells_clean$well_status == "ACTIVE" ~ "RED", 
+                                                           wells_clean$well_status == "COMPLETED" ~ "GREEN", 
+                                                           wells_clean$well_status == "INACTIVE" ~ "BLUE",
+                                                           TRUE ~ "BLACK"), data = wells_clean)
+```
+
+## Wells near the RadNet site with production
+```{r}
+# lon, lat of Carlsbad monitor:  (32.3840, -104.2640)
+carlsbad_lonlat <- c(-104.2640, 32.3840)
+distance_km <- function(long, lati){
+  start <- c(long, lati)
+  distGeo(start, carlsbad_lonlat) / 1000
+}
+```
+
+
+```{r}
+wells_prod_sum <- wells_prod %>% group_by(api) %>% summarise(total_gas = sum(monthly_gas, na.rm = TRUE),
+                                                    total_oil = sum(monthly_oil, na.rm = TRUE))
+```
+
+```{r}
+wells_prod_sum
+```
+
+```{r}
+wells_prod_merg <- merge(x = wells_clean,
+                        y = wells_prod_sum,
+                        by.x = "api",
+                        by.y = "api",
+                        all.x = TRUE,
+                        all.y = TRUE) 
+```
+
+
+```{r}
+wells_prod_distance <- wells_prod_merg %>% 
+  mutate(distToCarls = mapply(distance_km, uog_lon, uog_lat)) %>% 
+  select(-c("first_prod_date", "spud_date", "last_prod_date", "completion_date"))
+```
+
+```{r}
+wells_prod_distance <- wells_prod_distance %>% 
+  mutate(dist_cat = case_when(distToCarls < 5 ~ "<5km",
+                              distToCarls >= 5 & distToCarls < 10 ~ "5~10km",
+                              distToCarls >= 10 & distToCarls < 20 ~ "10~20km",
+                              distToCarls >= 20 & distToCarls < 30 ~ "20~30km",
+                              distToCarls >= 30 & distToCarls < 40 ~ "30~40km",
+                              distToCarls >= 40 & distToCarls < 50 ~ "40~50km",
+                              TRUE ~ ">=50km"))
+```
+```{r}
+wells_prod_distance %>% 
+  group_by(dist_cat) %>% 
+  summarize(count = n())
+```
+```{r}
+length((wells_prod_distance %>% filter(well_status == "ACTIVE"))$api)
+```
+
+
+```{r}
+leaflet() %>%
+  addProviderTiles("Esri.WorldImagery") %>% 
+  addProviderTiles("CartoDB.PositronOnlyLabels") %>% 
+  addCircleMarkers(data=data.frame(lng=-104.2640, lat=32.3840),lng=~lng,lat=~lat,
+                   radius=7,fillColor=~'black',fillOpacity = 0.99, weight = 1,
+                   col='white',stroke = T, group = 'RadNet Monitor') %>% 
+  addCircleMarkers(data=wells_prod_distance %>% filter(well_status == "ACTIVE"), lng=~uog_lon, lat=~uog_lat,
+                   stroke = T, fillColor = ~case_when(dist_cat == "<5km" ~ "red",
+                                                      dist_cat == "5~10km" ~ "orange",
+                                                      dist_cat == "10~20km" ~ "yellow",
+                                                      dist_cat == "20~30km" ~ "green",
+                                                      dist_cat == "30~40km" ~ "cyan",
+                                                      dist_cat == "40~50km" ~ "blue",
+                                                      dist_cat == ">=50km" ~ "purple"
+                     
+                   ), radius = 2, weight = 1,
+                   group = 'Flares', col='white', fillOpacity = 0.7) %>% 
+  addLegend(colors = c('red', 'orange', 'yellow', 'green', 'cyan', 
+                       'blue','purple', 'black'), 
+            labels = c('<5km','5~10km','10-20km','20-30km','30-40km','40-50km','>=50km', 'RadNet monitor'),
+            position = 'bottomleft')
+```
+
