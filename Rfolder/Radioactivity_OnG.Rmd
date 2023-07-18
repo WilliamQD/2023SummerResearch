@@ -230,6 +230,10 @@ weather_daily <- weatherex %>%
             mean_ws = mean(ws),
             oil = mean(oil),
             gas = mean(gas),
+            o3 = mean(o3),
+            PM25 = mean(PM25),
+            nox = mean(nox),
+            season = Mode(season),
             # add most frequent wind direction
             most_wind_direction = Mode(wd_sec))
 ```
@@ -468,11 +472,14 @@ pb_vnf_daily <- pb_vnf_complete %>% select(-mean_result) %>% group_by(date) %>%
             mean_ws = mean(mean_ws),
             oil = mean(oil),
             gas = mean(gas),
+            nox = mean(nox),
+            o3 = mean(o3),
+            season = Mode(season),
             month_count = mean(month_count),
             day_count = mean(day_count))
 ```
 ```{r}
-GB_daily_complete <- merge(x = GB_each,
+GB_daily_complete <- merge(x = GB_daily,
                           y = pb_vnf_daily,
                           by.x = "date",
                           by.y = "date",
@@ -484,12 +491,21 @@ GB_daily_complete <- merge(x = GB_each,
 # Modeling with GB_daily
 lm_gb <- lm(Result * 1000 ~ ., data=GB_daily_complete)
 summary(lm_gb)
-gam_gb <- gam(Result ~ date + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + oil + gas +month_count + day_count , data=GB_daily_complete)
+gam_gb <- gam(Result * 1000 ~ date + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + oil + gas +month_count + day_count , data=GB_daily_complete)
 summary(gam_gb)
 ```
 ```{r}
-gam_gb_v2 <- gam(Result ~ s(as.numeric(date), bs="cr") + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + s(oil, bs="cr") + s(gas, bs="cr") + month_count + day_count , data=GB_daily_complete)
+gam_gb_v1.5 <- gam(Result * 1000 ~ s(as.numeric(date), bs="cr") + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + s(oil, bs="cr") + s(gas, bs="cr") + month_count + day_count, data=GB_daily_complete)
+summary(gam_gb_v1.5)
+```
+
+```{r}
+gam_gb_v2 <- gam(Result * 1000 ~ s(as.numeric(date), bs="cr") + distToCarls + temp_bb + rhi + area_bb + mean_solar + mean_temp + mean_ws + s(oil, bs="cr") + s(gas, bs="cr") + month_count + day_count + season + o3 + nox, data=GB_daily_complete)
 summary(gam_gb_v2)
 ```
+```{r}
+plot(gam_gb_v2)
+```
+
 
 

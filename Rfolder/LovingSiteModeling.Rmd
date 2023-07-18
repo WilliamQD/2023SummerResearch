@@ -425,12 +425,24 @@ hourly_gam_v2 <- gam(rd_particle ~ hour + temp_f + wsp + solr + t_room_f + no + 
 summary(hourly_gam_v2)
 ```
 ```{r}
-hourly_lm_v1 <- lm(radon ~ hour + temp_f + wsp + solr + t_room_f + nox + o3 + count, data=hourly_data)
-summary(hourly_lm_v1)
+# taking out no, no2, t_room_f
+hourly_gam_v3 <- gam(radon ~ hour + temp_f + wsp  + o3 + count, data=hourly_data)
+summary(hourly_gam_v3)
 ```
 
 ```{r}
-vif(hourly_lm_v1)
+# taking out no, no2, t_room_f for rd
+hourly_gam_v4 <- gam(rd_particle ~ hour  + no2 + wsp  + o3 + count, data=hourly_data)
+summary(hourly_gam_v4)
+```
+
+# Checking for correlation between solr and o3
+```{r}
+cor(hourly_data$solr, hourly_data$o3, method="pearson")
+```
+```{r}
+# somewhat a positive trend
+plot(hourly_data$solr, hourly_data$o3)
 ```
 
 # Machine learning models
