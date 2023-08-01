@@ -292,7 +292,7 @@ pb_vnf_complete <- merge(x = pb_vnf_complete,
                          all.x = TRUE,
                          all.y = TRUE)
 ```
-```{r}
+```{r} 
 # modeling
 lm_complete <- lm(mean_result ~ temp_bb + 
                     rhi + 

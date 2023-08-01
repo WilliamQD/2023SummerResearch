@@ -1,0 +1,19 @@
+Location,Medium,Sample Date,Procedure Name,Nuclides/ Radiation,Result,Combined Standard Uncertainty,MDC,Unit
+ALBUQUERQUE,AIR-FILTER,2010-12-31,Gamma-ray Spectrometry,Cesium-137,,,6.7,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2018-11-21,Gamma-ray Spectrometry,Cesium-137,0.00002,0.000028,0.000095,PCI/M3
+ALBUQUERQUE,AIR-FILTER,2018-12-31,Gamma-ray Spectrometry,Cesium-137,5.8,1.6,4,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2020-12-31,Gamma-ray Spectrometry,Cesium-137,2.4,1.7,5.5,ACI/M3
+CARLSBAD,AIR-FILTER,2014-02-7,Gamma-ray Spectrometry,Cesium-137,-0.00005805,0.00042,0.00073,PCI/M3
+CARLSBAD,AIR-FILTER,2014-02-11,Gamma-ray Spectrometry,Cesium-137,-0.000067389,0.00025,0.00055,PCI/M3
+CARLSBAD,AIR-FILTER,2014-02-18,Gamma-ray Spectrometry,Cesium-137,-2.6736E-06,0.00012,0.00044,PCI/M3
+CARLSBAD,AIR-FILTER,2014-02-14,Gamma-ray Spectrometry,Cesium-137,-7.0797E-06,0.00042,0.00096,PCI/M3
+CARLSBAD,AIR-FILTER,2014-12-31,Gamma-ray Spectrometry,Cesium-137,8.3,1.6,3.6,ACI/M3
+CARLSBAD,AIR-FILTER,2016-12-31,Gamma-ray Spectrometry,Cesium-137,4.3,1.3,3.4,ACI/M3
+CARLSBAD,AIR-FILTER,2017-12-31,Gamma-ray Spectrometry,Cesium-137,3.7,1.1,3.4,ACI/M3
+CARLSBAD,AIR-FILTER,2018-12-31,Gamma-ray Spectrometry,Cesium-137,6.6,1.6,4.1,ACI/M3
+CARLSBAD,AIR-FILTER,2019-12-31,Gamma-ray Spectrometry,Cesium-137,5.4,1.1,3.4,ACI/M3
+CARLSBAD,AIR-FILTER,2020-12-31,Gamma-ray Spectrometry,Cesium-137,4.41,0.97,2.5,ACI/M3
+CARLSBAD,AIR-FILTER,2021-12-31,Gamma-ray Spectrometry,Cesium-137,8.9,4,10,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2010-12-31,Gamma-ray Spectrometry,Cesium-137,2.2,1.2,,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2019-12-31,Gamma-ray Spectrometry,Cesium-137,2.4,1.6,5.3,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2020-12-31,Gamma-ray Spectrometry,Cesium-137,5.8,1.6,4,ACI/M3

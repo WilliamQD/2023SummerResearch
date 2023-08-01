@@ -356,12 +356,17 @@ summary(count_poll_lm)
 count_poll_lmv2 <- lm(radon ~ date + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3 + count, data = flaring_sameday_count_poll)
 summary(count_poll_lmv2)
 ```
-
+```{r}
+# include indicator for flare
+flaring_sameday_count_poll <- flaring_sameday_count_poll %>% mutate(flare = ifelse(count > 0, 1, 0))
+```
 ```{r}
 # this one no flaring measurements except count again
-count_poll_gam <- gam(radon ~ date + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3 + count, data = flaring_sameday_count_poll)
+count_poll_gam <- gam(radon ~ date + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3  + flare, data = flaring_sameday_count_poll)
 summary(count_poll_gam)
 ```
+
+
 
 
 # Hourly Modeling
@@ -426,14 +431,21 @@ summary(hourly_gam_v2)
 ```
 ```{r}
 # taking out no, no2, t_room_f
-hourly_gam_v3 <- gam(radon ~ hour + temp_f + wsp  + o3 + count, data=hourly_data)
+hourly_gam_v3 <- gam(radon ~ s(as.numeric(date) , bs="cr")  + s(hour, bs="cc") + temp_f + wsp  + o3 + count, data=hourly_data)
 summary(hourly_gam_v3)
 ```
+```{r}
+plot(hourly_gam_v3)
+```
+
 
 ```{r}
 # taking out no, no2, t_room_f for rd
-hourly_gam_v4 <- gam(rd_particle ~ hour  + no2 + wsp  + o3 + count, data=hourly_data)
+hourly_gam_v4 <- gam(rd_particle ~ s(as.numeric(date) , bs="cr") + s(hour, bs="cc")  + no2 + wsp  + o3 + count, data=hourly_data)
 summary(hourly_gam_v4)
+```
+```{r}
+plot(hourly_gam_v4)
 ```
 
 # Checking for correlation between solr and o3
@@ -479,4 +491,11 @@ varImpPlot(hourly_rf)
 # hourly lag
 acf(lovings_hourly$radon[1:1000])
 ```
+```{r}
+fit <- forecast::auto.arima(lovings_hourly$radon[1:1000])
+```
+```{r}
+forecast::checkresiduals(fit)
+```
+
 

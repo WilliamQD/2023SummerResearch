@@ -1,0 +1,24 @@
+Location,Medium,Sample Date,Procedure Name,Nuclides/ Radiation,Result,Combined Standard Uncertainty,MDC,Unit
+ALBUQUERQUE,AIR-FILTER,2010-12-31,Gamma-ray Spectrometry,Potassium-40,223,33,,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2014-12-31,Gamma-ray Spectrometry,Potassium-40,356,55,120,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2016-12-31,Gamma-ray Spectrometry,Potassium-40,211,29,62,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2017-12-31,Gamma-ray Spectrometry,Potassium-40,235,23,41,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2018-12-31,Gamma-ray Spectrometry,Potassium-40,353,33,44,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2019-12-31,Gamma-ray Spectrometry,Potassium-40,281,29,43,ACI/M3
+ALBUQUERQUE,AIR-FILTER,2020-12-31,Gamma-ray Spectrometry,Potassium-40,225,31,79,ACI/M3
+CARLSBAD,AIR-FILTER,2014-12-31,Gamma-ray Spectrometry,Potassium-40,511,38,43,ACI/M3
+CARLSBAD,AIR-FILTER,2015-12-31,Gamma-ray Spectrometry,Potassium-40,266,23,41,ACI/M3
+CARLSBAD,AIR-FILTER,2016-12-31,Gamma-ray Spectrometry,Potassium-40,314,26,41,ACI/M3
+CARLSBAD,AIR-FILTER,2017-12-31,Gamma-ray Spectrometry,Potassium-40,409,32,42,ACI/M3
+CARLSBAD,AIR-FILTER,2018-12-31,Gamma-ray Spectrometry,Potassium-40,491,41,64,ACI/M3
+CARLSBAD,AIR-FILTER,2019-12-31,Gamma-ray Spectrometry,Potassium-40,369,29,36,ACI/M3
+CARLSBAD,AIR-FILTER,2020-12-31,Gamma-ray Spectrometry,Potassium-40,434,33,41,ACI/M3
+CARLSBAD,AIR-FILTER,2021-12-31,Gamma-ray Spectrometry,Potassium-40,391,64,110,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2010-12-31,Gamma-ray Spectrometry,Potassium-40,286,30,,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2014-12-31,Gamma-ray Spectrometry,Potassium-40,187,26,57,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2015-12-31,Gamma-ray Spectrometry,Potassium-40,129,18,40,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2016-12-31,Gamma-ray Spectrometry,Potassium-40,191,22,44,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2017-12-31,Gamma-ray Spectrometry,Potassium-40,210,23,34,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2018-12-31,Gamma-ray Spectrometry,Potassium-40,282,32,46,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2019-12-31,Gamma-ray Spectrometry,Potassium-40,153,32,68,ACI/M3
+NAVAJO LAKE,AIR-FILTER,2020-12-31,Gamma-ray Spectrometry,Potassium-40,248,25,35,ACI/M3

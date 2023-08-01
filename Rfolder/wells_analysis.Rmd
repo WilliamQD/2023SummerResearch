@@ -120,3 +120,24 @@ leaflet() %>%
             position = 'bottomleft')
 ```
 
+# adding updated well's production data, Unfinished
+```{r}
+july23_wells <- read.csv("wells_cb_july23.CSV")
+```
+```{r}
+july23_prod <- read.csv("wells_prod_cb_july23.CSV")
+```
+```{r}
+july23_prod_clean <- july23_prod %>% 
+  select("Monthly.Production.Date", "Monthly.Oil", "Monthly.Gas", "Well.Status", "Production.Type", "Well.Name") %>% 
+  filter(Monthly.Production.Date >= "2010-01-01") 
+```
+```{r}
+# july23_prod_clean <- merge(x = july23_prod_clean,
+#                            y = wells_clean %>% select("Operator.Company.Name", "uog_lon", "uog_lat"),
+#                            by.x = "Operator.Company.Name",
+#                            by.y = "Well.Name",
+#                            )
+
+```
+
