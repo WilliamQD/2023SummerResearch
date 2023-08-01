@@ -15,7 +15,11 @@ Radium also decays into radon isotopes and, when inhaled, deposit radiation in l
 *Source*: https://journals.sagepub.com/doi/pdf/10.2190/NS.23.1.h
 Soil and water (sludge) obtained from reserve pits used in unconventional natural gas mining was analyzed for the presence of technologically enhanced naturally occurring radioactive material (TENORM). Samples were analyzedfor total gamma, alpha, and beta radiation, and specific radionuclides: beryllium, potassium, scandium, cobalt, cesium, thallium, lead-210 and -214, bismuth-212 and -214, radium-226 and -228, thorium, uranium, and strontium-89 and -90. Laboratory analysis confirmed elevated beta readings recorded at 1329 ± 311 pCi/g. Specific radionuclides present in an active reserve pit and the soil of a leveled, vacated reserve pit included 232Thorium decay series (228Ra, 228Th, 208Tl), and 226Radium decay series (214Pb, 214Bi, 210Pb) radionuclides. The potential for impact of TENORM to the environment, occupational workers, and the general public is presented with potential health effects of individual radionuclides. Current oversight, exemption of TENORM in federal and state regulations, and complexity in reporting are discussed.
 
-```{r}
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE)
+```
+
+```{r, include=FALSE}
 library(dplyr)
 library(ggplot2)
 library(geosphere)
@@ -28,35 +32,39 @@ library(gridExtra)
 ```
 
 ```{r}
-GB <- read.csv("./radNet/radnet-GB-new.csv")
-potassium40 <- read.csv("./radNet/radnet-potassium40.csv")
-radium228 <- read.csv("./radNet/radnet-radium228.csv")
+GB <- read.csv("./radNet-data/radnet-GB-new.csv")
+potassium40 <- read.csv("./radNet-data/radnet-potassium40.csv")
+radium228 <- read.csv("./radNet-data/radnet-radium228.csv")
 ```
 
-# radium-228
-```{r, include=FALSE}
-radium228 %>% filter(Location == "CARLSBAD")
-```
-
-# potassium-40
-```{r, include=FALSE}
-potassium40 %>% filter(Location == "CARLSBAD")
-```
-
-
-
-# gross beta
+### radium-228
 ```{r}
-GB %>% filter(Location == "CARLSBAD")
+head(radium228 %>% filter(Location == "CARLSBAD"))
+```
+
+### potassium-40
+```{r}
+head(potassium40 %>% filter(Location == "CARLSBAD"))
+```
+
+
+
+### gross beta
+```{r}
+head(GB %>% filter(Location == "CARLSBAD"))
 ```
 ```{r}
 # group gross beta measurement monthly
 GB_monthly <- GB %>% filter(Location == "CARLSBAD") %>% mutate(Date = substr(Sample.Date, 1, 7)) %>% group_by(Date) %>% 
   summarize(mean_result = mean(Result))
+
 ```
 ```{r}
-ggplot(GB_monthly, aes(Date, mean_result)) +
-  geom_point()
+GB_monthly_forplot <- GB_monthly %>% mutate(Date2 = as.Date(paste0(Date, '-01')))
+
+ggplot(GB_monthly_forplot, aes(Date2, mean_result)) +
+  geom_point() + 
+  labs(title = "Mean monthly GB measurements", x = "Date")
 ```
 
 ## Merging flaring data
@@ -109,7 +117,7 @@ library(leaflet.extras)
 ```
 
 
-```{r, include=FALSE}
+```{r, include=TRUE}
 leaflet() %>%
   addProviderTiles("Esri.WorldImagery") %>% 
   addProviderTiles("CartoDB.PositronOnlyLabels") %>% 
@@ -131,7 +139,7 @@ leaflet() %>%
 
 ## Connecting to radioactivity measurement
 ```{r}
-GB_monthly
+head(GB_monthly)
 ```
 ```{r}
 pb_vnf_monthly <- pb_vnf_distance %>% mutate(date = substr(date, 1, 7)) %>% group_by(date) %>% 

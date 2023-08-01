@@ -96,7 +96,7 @@ dwtest(lovings$radon_pCi ~ lovings$new_time)
 ```
 # Part 2: Radon and Gross Beta measurement
 ```{r}
-GB_new <- read.csv("./radNet/radnet-GB-new.csv")
+GB_new <- read.csv("./radNet-data/radnet-GB-new.csv")
 ```
 ```{r}
 # subset to only 4-15 to 6-13
