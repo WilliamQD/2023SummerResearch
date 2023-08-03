@@ -109,7 +109,8 @@ ggplot(lovings_daily) +
   scale_y_continuous(
     "radon (pCi)", 
     sec.axis = sec_axis(~ . * 0.01666, name = "GB (pCi)")
-  )
+  ) +
+  labs(title = "Radon vs GB (red) measurements")
 ```
 *Comment:* Could not really associate GB from RadNet and Radon since insufficient GB measurements over the 2 months.
 
@@ -362,10 +363,14 @@ flaring_sameday_count_poll <- flaring_sameday_count_poll %>% mutate(flare = ifel
 ```
 ```{r}
 # this one no flaring measurements except count again
-count_poll_gam <- gam(radon ~ date + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3  + flare, data = flaring_sameday_count_poll)
+count_poll_gam <- gam(radon ~ s(as.numeric(date), bs="cr") + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3  + flare, data = flaring_sameday_count_poll)
 summary(count_poll_gam)
 ```
 
+```{r}
+count_poll_gam_v2 <- gam(radon ~ s(as.numeric(date), bs="cr") + mean_nox + mean_no + mean_press + mean_wsp + mean_relh + mean_o3 , data = flaring_sameday_count_poll)
+summary(count_poll_gam_v2)
+```
 
 
 
@@ -448,7 +453,7 @@ summary(hourly_gam_v4)
 plot(hourly_gam_v4)
 ```
 
-# Checking for correlation between solr and o3
+### Checking for correlation between solr and o3
 ```{r}
 cor(hourly_data$solr, hourly_data$o3, method="pearson")
 ```
@@ -486,7 +491,6 @@ varImpPlot(hourly_rf)
 
 # Time Series
 
-
 ```{r}
 # hourly lag
 acf(lovings_hourly$radon[1:1000])
@@ -498,4 +502,64 @@ fit <- forecast::auto.arima(lovings_hourly$radon[1:1000])
 forecast::checkresiduals(fit)
 ```
 
+### Nox, o3 as response
+```{r}
+hourly_nox <- gam(nox ~ s(hour, bs="cr") + temp_f + wsp + solr + t_room_f + no + no2 + o3 + count, data=hourly_data)
+summary(hourly_nox)
+```
+
+```{r}
+hourly_nox_v2 <- gam(nox ~ s(hour, bs="cr") + temp_f + wsp + solr + t_room_f + o3 + count, data=hourly_data)
+summary(hourly_nox_v2)
+```
+```{r}
+plot(hourly_nox_v2)
+```
+
+```{r}
+hourly_o3 <- gam(o3 ~ s(hour, bs="cr") + temp_f + wsp + solr + t_room_f +  nox  + count, data=hourly_data)
+summary(hourly_o3)
+```
+```{r}
+plot(hourly_o3)
+```
+
+
+### adding new production data
+```{r}
+july23_prod <- read.csv("wells_prod_cb_july23.CSV")
+```
+```{r}
+july23_prod_clean <- july23_prod %>% 
+  select("Monthly.Production.Date", "Monthly.Oil", "Monthly.Gas", "Well.Status", "Production.Type", "Well.Name") %>% 
+  filter(Monthly.Production.Date >= "2023-01-01") 
+```
+```{r}
+july23_prod_clean[2:3][is.na(july23_prod_clean[2:3])] <- 0
+```
+
+```{r}
+july23_monthly_prod <- july23_prod_clean %>% group_by(Monthly.Production.Date) %>% 
+  summarize(monthly_oil = sum(Monthly.Oil),
+            monthly_gas = sum(Monthly.Gas))
+```
+
+```{r}
+flaring_sameday_count_poll <- flaring_sameday_count_poll %>% mutate(month = month(date))
+july23_monthly_prod <- july23_monthly_prod %>% mutate(month = month(Monthly.Production.Date))
+```
+
+```{r}
+flaring_ong <- merge(x = flaring_sameday_count_poll,
+                     y = july23_monthly_prod,
+                     by.x = 'month',
+                     by.y = 'month',
+                     all.x = FALSE,
+                     all.y = FALSE)
+```
+
+```{r}
+ong_gam <- gam(radon ~ s(as.numeric(date), bs="cr") + mean_no2 + mean_nox + mean_no + mean_room_f + mean_press + mean_wsp + mean_relh + mean_solar + mean_tempf + mean_o3  + flare + monthly_oil + monthly_gas, data = flaring_ong)
+summary(ong_gam)
+```
 

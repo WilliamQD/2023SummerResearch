@@ -541,4 +541,38 @@ concurvity(gam_gb_v3, full = FALSE)
 plot(gam_gb_v3)
 ```
 
+## GB flare counts only
+```{r}
+# including every GB observation even if flaring didn't happen on that day (0 for count)
+GB_daily_count <- merge(x = GB_daily,
+                          y = weather_daily,
+                          by.x = "date",
+                          by.y = "date",
+                          all.x = FALSE,
+                          all.y = FALSE)
+```
+
+```{r}
+GB_daily_count <- merge(x = GB_daily_count,
+                        y = vnf_day_counts,
+                        by.x = "date",
+                        by.y = "date",
+                        all.x = TRUE,
+                        all.y = FALSE)
+```
+```{r}
+GB_daily_count$day_count[is.na(GB_daily_count$day_count)] <- 0
+```
+```{r}
+colSums(is.na(GB_daily_count))
+```
+```{r}
+gam_gb_count <- gam(Result * 1000 ~ s(as.numeric(date), bs="cr") + mean_solar + mean_temp + mean_ws + s(oil, bs="cr") + s(gas, bs="cr") + PM25 + most_wind_direction + day_count + season + o3 + nox, data = GB_daily_count)
+summary(gam_gb_count)
+```
+
+```{r}
+gam_gb_count_v2 <- gam(Result  ~ s(as.numeric(date), bs="cr") + mean_solar  + mean_ws + s(oil, bs="cr") + s(gas, bs="cr") + day_count + season + o3 + nox, data = GB_daily_count)
+summary(gam_gb_count_v2)
+```
 
