@@ -64,6 +64,7 @@ GB_monthly_forplot <- GB_monthly %>% mutate(Date2 = as.Date(paste0(Date, '-01'))
 
 ggplot(GB_monthly_forplot, aes(Date2, mean_result)) +
   geom_point() + 
+  geom_smooth(method = "gam") +
   labs(title = "Mean monthly GB measurements", x = "Date")
 ```
 
@@ -514,6 +515,30 @@ summary(gam_gb_v2)
 ```{r}
 plot(gam_gb_v2)
 ```
+```{r}
+# according to the performance of the models, there should be problems with multicollinearity and concurvity
+vif(lm_gb)
+```
 
+```{r}
+concurvity(gam_gb_v2, full = FALSE)
+```
+
+
+```{r}
+# repeatedly removing the predictor of lowest significance
+gam_gb_v3 <- gam(Result ~  + rhi + s(oil, bs="cr") + s(gas, bs="cr")  + nox, data=GB_daily_complete)
+summary(gam_gb_v3)
+```
+
+
+
+```{r}
+concurvity(gam_gb_v3, full = FALSE)
+```
+
+```{r}
+plot(gam_gb_v3)
+```
 
 
