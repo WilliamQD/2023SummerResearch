@@ -1,0 +1,57 @@
+---
+title: "SummaryTables"
+author: "William Zhang"
+date: "2023-08-16"
+output: pdf_document
+---
+### Table Summary
+
+Table: Summary Statistics of Gross Beta GAM model after step-regression elimination. The smoothing parameter estimation method is "GCV.Cp". The smoothing splines for both 'oil' and 'gas' are cubic regression splines. 
+
+
+Variable | Coefficient | Std.Error | Prob. 
+------------------|------------------ |------------------ |------------------ 
+(Intercept) | `5.618e-03` | `6.759e-04` | `6.83e-11(***)`
+rhi  |  ` 8.876e-04` | `3.066e-04` |  `0.00567 (**) ` 
+nox  | `1.523e-04` |  `8.067e-05` |  `0.06506 (.)` 
+------------------|------------------ |------------------ |------------------ 
+**Smooth terms** | edf | Ref.df  |   p-value  
+s(oil)  | `4.514` | `5.459` | `0.01855 (*)` 
+s(gas) | `6.925`  | `7.702`  | `0.00441 (**)`
+------------------|------------------ |------------------ |------------------
+Adjusted R-squared:  0.469 | Deviance explained: 58.4% | Num.obs: 63 | GCV: 8.7211e-06
+
+
+Table: Summary Statistics of Hourly Radon GAM model after step-regression elimination. The smoothing spline for 'date' is the standard cubic regression spline and cyclic cubic regression spline for 'hour'. 
+
+Variable | Coefficient | Std.Error | Prob. 
+------------------|------------------ |------------------ |------------------ 
+(Intercept) |  `0.9616` |  `0.0540`  |  `< 2e-16(***)`
+o3         | `-0.0055`  |`0.0004` |  `< 2e-16(***)`
+temp_f     | `-0.0022` | `0.0007`   | `0.00527(**)` 
+wsp       |  `-0.0311` | `0.0026` |  `< 2e-16(***)`
+count (num. flaring)|  `0.0074` | `0.0015` | `2.98e-06(***)`
+------------------|------------------ |------------------ |------------------ 
+**Smooth terms** | edf | Ref.df  |   p-value  
+s(date) | `7.644` | `8.529` |  `<2e-16(***)`
+s(hour)           | `6.560` | `8.000` |  `<2e-16(***)`
+------------------|------------------ |------------------ |------------------
+Adjusted R-squared:  0.513 | Deviance explained: 52.1% | Num.obs: 1226 | GCV: 0.025349
+
+
+
+Table: Summary Statistics of Hourly Rd-particle GAM model after step-regression elimination. The smoothing spline for 'date' is the standard cubic regression spline and cyclic cubic regression spline for 'hour'. 
+
+Variable | Coefficient | Std.Error | Prob. 
+------------------|------------------ |------------------ |------------------ 
+(Intercept) |  `0.2358` |  `0.0145`  |  `< 2e-16(***)`
+o3         | `-0.0055`  |`0.0004` |  `< 2e-16(***)`
+no2        |  `0.0050` | `0.0004`  | `< 2e-16(***)`
+wsp       |  `-0.0064` | `0.0012` |  `1.89e-07(***)`
+count (num. flaring)|  `0.0025` | `0.0007` | `0.0003(***)`
+------------------|------------------ |------------------ |------------------ 
+**Smooth terms** | edf | Ref.df  |   p-value  
+s(date) | `8.343` | `8.875` |  `<2e-16(***)`
+s(hour) | `7.008` | `8.000` |  `<2e-16(***)`
+------------------|------------------ |------------------ |------------------
+Adjusted R-squared:  0.599 | Deviance explained: 60.5% | Num.obs: 1226 | GCV: 0.0048326
